@@ -1,0 +1,5 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="auth-brand brand">{% include 'includes/icon.html' with name='chart' %} Meu Financeiro</div>
+<section class="surface auth-card"><h1>{% if register %}Criar conta{% else %}Acesse sua conta{% endif %}</h1><p class="text-secondary mb-4">{% if register %}Comece a organizar suas receitas e despesas.{% else %}Entre para acompanhar suas finanças.{% endif %}</p><form method="post">{% csrf_token %}{% include 'includes/fields.html' %}<button class="btn btn-primary w-100" type="submit">{% if register %}Criar conta{% else %}Entrar{% endif %}</button></form><p class="auth-switch">{% if register %}Já possui conta? <a href="{% url 'login' %}">Entrar</a>{% else %}Ainda não tem conta? <a href="{% url 'register' %}">Criar conta</a>{% endif %}</p></section>
+{% endblock %}

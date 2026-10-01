@@ -1,0 +1,35 @@
+{% load static %}
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ title }} · Meu Financeiro</title>
+  <link rel="stylesheet" href="{% static 'vendor/bootstrap.min.css' %}">
+  <link rel="stylesheet" href="{% static 'app.css' %}">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='5' fill='%230d1925'/%3E%3Cpath d='M6 17v-5m6 5V8m6 9V4' stroke='%2310b990' stroke-width='3'/%3E%3C/svg%3E">
+</head>
+<body class="{% if user.is_authenticated %}app-layout{% else %}auth-layout{% endif %}">
+<a class="visually-hidden-focusable skip-link" href="#conteudo">Ir para o conteúdo</a>
+{% if user.is_authenticated %}
+<header class="mobile-header"><a class="brand" href="{% url 'home' %}">{% include 'includes/icon.html' with name='chart' %} Meu Financeiro</a><button class="icon-button" id="menu-toggle" type="button" aria-label="Abrir menu" aria-controls="sidebar" aria-expanded="false">{% include 'includes/icon.html' with name='menu' %}</button></header>
+<div id="nav-overlay" class="nav-overlay" hidden></div>
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-top"><a class="brand" href="{% url 'home' %}">{% include 'includes/icon.html' with name='chart' %}<span>Meu Financeiro</span></a><button class="icon-button mobile-close" id="menu-close" type="button" aria-label="Fechar menu">{% include 'includes/icon.html' with name='close' %}</button></div>
+  <p class="nav-caption">PRINCIPAL</p>
+  <nav class="side-nav" aria-label="Navegação principal">
+    <a href="{% url 'home' %}" {% if request.resolver_match.url_name == 'home' %}aria-current="page"{% endif %}>{% include 'includes/icon.html' with name='dashboard' %}<span>Dashboard</span></a>
+    <a href="{% url 'transactions' %}" {% if '/movimentacoes/' in request.path %}aria-current="page"{% endif %}>{% include 'includes/icon.html' with name='transactions' %}<span>Movimentações</span></a>
+    <a href="{% url 'categories' %}" {% if '/categorias/' in request.path or '/subcategorias/' in request.path %}aria-current="page"{% endif %}>{% include 'includes/icon.html' with name='categories' %}<span>Categorias</span></a>
+    <a href="{% url 'settings' %}" {% if request.resolver_match.url_name == 'settings' %}aria-current="page"{% endif %}>{% include 'includes/icon.html' with name='settings' %}<span>Configurações</span></a>
+  </nav>
+  <div class="sidebar-bottom"><div class="user-info"><span class="avatar">{{ user.email|first|upper }}</span><div><strong>{{ user.get_full_name|default:'Minha conta' }}</strong><span title="{{ user.email }}">{{ user.email }}</span></div></div><form action="{% url 'logout' %}" method="post">{% csrf_token %}<button type="submit" class="logout-button">{% include 'includes/icon.html' with name='logout' %} Sair da conta</button></form></div>
+</aside>
+{% endif %}
+<main id="conteudo" class="{% if user.is_authenticated %}app-main{% else %}auth-main{% endif %}">
+  {% for message in messages %}<div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags|default:'info' }}{% endif %}" role="status">{{ message }}</div>{% endfor %}
+  {% block content %}{% endblock %}
+  {% if user.is_authenticated %}<footer class="app-footer">Meu Financeiro <span>Controle financeiro pessoal</span></footer>{% endif %}
+</main>
+{% if user.is_authenticated %}<script src="{% static 'navigation.js' %}" defer></script>{% endif %}
+{% block scripts %}{% endblock %}
+</body></html>

@@ -1,0 +1,4 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="form-shell"><a class="back-link" href="{% url back_url %}">← Voltar</a><h1 class="h2 mt-3">{{ title }}</h1><p class="text-secondary">{{ note }}</p><div class="surface p-4 mt-4"><p class="small text-secondary">Campos com * são obrigatórios.</p><form method="post">{% csrf_token %}{% include 'includes/fields.html' %}<div class="d-flex gap-2"><button class="btn btn-primary" type="submit">Salvar</button><a class="btn btn-light" href="{% url back_url %}">Cancelar</a></div></form></div></div>
+{% endblock %}
