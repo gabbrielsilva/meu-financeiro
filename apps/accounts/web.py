@@ -1,4 +1,5 @@
 from types import SimpleNamespace
+import logging
 from django.contrib import messages
 from django.contrib.auth import authenticate, get_user_model, login, logout
 from django.contrib.auth.decorators import login_required
@@ -6,17 +7,21 @@ from django.db import IntegrityError
 from django.shortcuts import redirect, render
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_POST, require_http_methods
-from rest_framework.throttling import ScopedRateThrottle
+from .throttling import AuthRateThrottle, AuthThrottleUnavailable
 from .forms import LoginForm, RegisterForm
 from .serializers import LoginSerializer, RegisterSerializer
 from .services import register_user
 
 
 def check_auth_throttle(request, scope, form):
-    allowed = ScopedRateThrottle().allow_request(request, SimpleNamespace(throttle_scope=scope))
+    try:
+        allowed = AuthRateThrottle().allow_request(request, SimpleNamespace(throttle_scope=scope))
+    except AuthThrottleUnavailable:
+        form.add_error(None, "Não foi possível verificar o acesso. Tente novamente em instantes.")
+        return 503
     if not allowed:
         form.add_error(None, "Muitas tentativas. Aguarde antes de tentar novamente.")
-    return allowed
+    return 200 if allowed else 429
 
 
 @never_cache
@@ -28,14 +33,16 @@ def register_page(request):
     response_status = 200
     if request.method == "POST":
         valid = form.is_valid()
-        if not check_auth_throttle(request, "register", form):
-            response_status = 429
+        response_status = check_auth_throttle(request, "register", form)
+        if response_status != 200:
+            pass
         elif valid:
             serializer = RegisterSerializer(data={key: form.cleaned_data[key] for key in ("email", "password")})
             if serializer.is_valid():
                 try:
                     register_user(**serializer.validated_data)
                 except IntegrityError:
+                    logging.getLogger(__name__).warning("Conflito no cadastro", exc_info=True)
                     form.add_error("email", "Não foi possível cadastrar este e-mail.")
                 else:
                     messages.success(request, "Conta criada! Entre para começar.")
@@ -54,8 +61,9 @@ def login_page(request):
     response_status = 200
     if request.method == "POST":
         valid = form.is_valid()
-        if not check_auth_throttle(request, "login", form):
-            response_status = 429
+        response_status = check_auth_throttle(request, "login", form)
+        if response_status != 200:
+            pass
         elif valid:
             serializer = LoginSerializer(data=form.cleaned_data)
             if serializer.is_valid():

@@ -53,3 +53,46 @@ de uma implantação em produção.
   Totais, distribuição com despesas e mutações foram cobertos no banco de testes.
 - Sessão de QA encerrada; login disponível para revisão. PostgreSQL e Django ativos.
 - Sem bloqueios conhecidos. Verificação de produção não faz parte desta etapa.
+
+## Preparação para produção — 01/10/2026
+
+- Suíte ampliada para 67 testes (62 anteriores + 5 de configuração/produção).
+- Smoke test em subprocesso com DJANGO_ENV=production, secrets aleatórios em memória,
+  DEBUG=False e banco inacessível: inicialização, collectstatic temporário, CSS/JS/SVG
+  com cache por hash, HTTPS, CSRF e páginas 400/403/404/500 aprovados. Sem acesso ao
+  banco de desenvolvimento. Validação do formato dos logs também aprovada.
+- Um erro inicial em collectstatic detectou sourceMappingURL ausente do Bootstrap;
+  somente esse comentário foi removido e os testes passaram.
+- manage.py check: nenhum problema. makemigrations --check --dry-run: sem mudanças.
+  migrate --check: sucesso. pip check: nenhuma incompatibilidade.
+- check --deploy em produção com HSTS=0: apenas W004. Com HSTS=3600: W005 e W021
+  (subdomínios/preload), aguardando decisão de domínio/HTTPS. Nenhum aviso silenciado.
+- check --deploy local: W004/W008/W012/W016/W018 esperados para desenvolvimento HTTP.
+- .env preservado; dados locais, caches e secrets continuam ignorados. Não houve
+  alteração de esquema, migração de dados, deploy, commit ou push.
+
+## Correções após revisão — 01/10/2026
+
+- 79 testes aprovados em 19,737 segundos (67 anteriores + 12 regressões).
+- Testes incluem edição/exclusão com instância antiga, duas edições simultâneas em
+  conexões separadas, seis tentativas concorrentes respeitando cinco permissões,
+  falsificação de X-Forwarded-For, proxy autorizado, HTML/API compartilhando limites,
+  falha do contador retornando 503, expiração/limpeza e JSON de tipos inválidos.
+- Migração accounts.0002_authratebucket aplicada; somente nova tabela técnica.
+- check, makemigrations --check --dry-run, migrate --check e pip check aprovados.
+- Testes isolados de produção/estáticos da suíte anterior continuam aprovados.
+- Sem deploy, commit ou push. .env e registros financeiros existentes preservados.
+
+## Reenvio e formulários antigos — 01/10/2026
+
+- 91 testes aprovados em 24,837 segundos, incluindo 12 testes novos desta etapa.
+- Reenvio igual retorna o mesmo ID e mantém o total; chaves diferentes permitem duas
+  movimentações iguais; chaves são isoladas por usuário; payload divergente/excluído
+  é rejeitado; tentativa inválida não consome chave; duas conexões simultâneas criam
+  apenas um registro. Versões ausentes/antigas são rejeitadas em edição e exclusão.
+- Interface testada para preservar campos após conflito e exigir nova confirmação
+  de exclusão quando o registro mudou. Testes existentes adaptados ao novo contrato
+  obrigatório da API, mantendo as verificações financeiras anteriores.
+- Migração transactions.0003 aplicada. check sem problemas, makemigrations --check
+  --dry-run sem alterações, migrate --check aprovado e pip check sem incompatibilidade.
+- Nenhuma nova biblioteca; nenhum deploy, commit ou push nesta etapa.

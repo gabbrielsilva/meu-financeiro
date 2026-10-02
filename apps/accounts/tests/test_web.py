@@ -1,4 +1,5 @@
 from datetime import timedelta
+from uuid import uuid4
 from django.core.cache import cache
 from django.test import Client, TestCase, override_settings
 from django.utils import timezone
@@ -19,7 +20,7 @@ class WebTests(TestCase):
         cache.clear()
         self.category = Category.objects.get(user=self.user, name="Alimentação")
         self.sub = self.category.subcategories.get(name="Mercado")
-        self.payload = {"type": "DESPESA", "amount": "32,50", "category": self.category.pk, "subcategory": self.sub.pk, "payment_method": "PIX", "description": "Registro visual", "transaction_date": timezone.localdate().isoformat()}
+        self.payload = {"request_id": str(uuid4()), "type": "DESPESA", "amount": "32,50", "category": self.category.pk, "subcategory": self.sub.pk, "payment_method": "PIX", "description": "Registro visual", "transaction_date": timezone.localdate().isoformat()}
 
     def test_private_pages_redirect_to_login(self):
         for path in ("/", "/categorias/", "/categorias/nova/", "/subcategorias/", "/subcategorias/nova/", "/movimentacoes/", "/movimentacoes/nova/", "/movimentacoes/1/editar/", "/movimentacoes/1/excluir/"):
@@ -79,14 +80,14 @@ class WebTests(TestCase):
         movement = Transaction.objects.get(user=self.user)
         self.assertEqual(str(movement.amount), "32.50")
         self.assertEqual(self.client.get(f"/movimentacoes/{movement.pk}/editar/").status_code, 200)
-        self.assertRedirects(self.client.post(f"/movimentacoes/{movement.pk}/editar/", {**self.payload, "amount": "45,00"}), "/movimentacoes/")
+        self.assertRedirects(self.client.post(f"/movimentacoes/{movement.pk}/editar/", {**self.payload, "expected_version": movement.updated_at.isoformat(), "amount": "45,00"}), "/movimentacoes/")
         self.client.logout()
         self.client.force_login(self.user)
         self.assertContains(self.client.get("/movimentacoes/"), "45,00")
         self.assertEqual(self.client.get(f"/movimentacoes/{movement.pk}/excluir/").status_code, 200)
         movement.refresh_from_db()
         self.assertIsNone(movement.deleted_at)
-        self.assertRedirects(self.client.post(f"/movimentacoes/{movement.pk}/excluir/"), "/movimentacoes/")
+        self.assertRedirects(self.client.post(f"/movimentacoes/{movement.pk}/excluir/", {"expected_version": movement.updated_at.isoformat()}), "/movimentacoes/")
         movement.refresh_from_db()
         self.assertIsNotNone(movement.deleted_at)
         self.assertNotContains(self.client.get("/movimentacoes/"), "Registro visual")
@@ -115,4 +116,4 @@ class WebTests(TestCase):
         self.assertEqual(self.client.get("/movimentacoes/", {"page": "bad"}).status_code, 200)
         self.category.is_active = False
         self.category.save()
-        self.assertRedirects(self.client.post(f"/movimentacoes/{movement.pk}/editar/", {**self.payload, "description": "Correção histórica"}), "/movimentacoes/")
+        self.assertRedirects(self.client.post(f"/movimentacoes/{movement.pk}/editar/", {**self.payload, "expected_version": movement.updated_at.isoformat(), "description": "Correção histórica"}), "/movimentacoes/")

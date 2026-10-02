@@ -22,3 +22,7 @@ staticfiles/
 *~
 .DS_Store
 Thumbs.db
+.secrets/
+*.key
+*.p12
+*.pfx

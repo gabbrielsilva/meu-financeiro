@@ -5,7 +5,7 @@ from rest_framework.views import APIView
 from apps.categories.api import OwnedViewSet
 from .models import PaymentMethod, Transaction
 from .queries import history
-from .serializers import TransactionSerializer
+from .serializers import TransactionSerializer, VersionSerializer
 from .services import soft_delete
 
 
@@ -24,7 +24,9 @@ class TransactionViewSet(mixins.DestroyModelMixin, OwnedViewSet):
         return Transaction.objects.filter(user=self.request.user, deleted_at__isnull=True).select_related("category", "subcategory")
 
     def perform_destroy(self, instance):
-        soft_delete(instance)
+        version = VersionSerializer(data=self.request.data)
+        version.is_valid(raise_exception=True)
+        soft_delete(instance, version.validated_data["expected_version"])
 
 
 class PaymentMethodsView(APIView):

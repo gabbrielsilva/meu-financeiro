@@ -1,4 +1,6 @@
 from django.db import IntegrityError, transaction
+from collections.abc import Mapping
+import logging
 from rest_framework import serializers
 from apps.accounts.serializers import StrictSerializer
 from .models import Category, MovementType, Subcategory
@@ -8,6 +10,8 @@ class OwnedSerializer(StrictSerializer, serializers.ModelSerializer):
     """Write rules used by both HTML forms and REST endpoints."""
 
     def to_internal_value(self, data):
+        if not isinstance(data, Mapping):
+            raise serializers.ValidationError({"non_field_errors": ["Envie um objeto com os campos esperados."]})
         forbidden = set(data) & {name for name, field in self.fields.items() if field.read_only}
         if forbidden:
             raise serializers.ValidationError({key: "Campo não permitido." for key in forbidden})
@@ -18,7 +22,15 @@ class OwnedSerializer(StrictSerializer, serializers.ModelSerializer):
             with transaction.atomic():
                 return super().save(**kwargs)
         except IntegrityError as exc:
+            logging.getLogger(__name__).warning("Conflito de integridade", exc_info=True)
             raise serializers.ValidationError({"non_field_errors": ["Dados conflitantes. Verifique os vínculos e nomes já cadastrados."]}) from exc
+
+    def update(self, instance, validated_data):
+        # save() owns the transaction; compare the snapshot after acquiring the lock.
+        current = type(instance).objects.select_for_update().get(pk=instance.pk, user=instance.user)
+        if current.updated_at != instance.updated_at or getattr(current, "deleted_at", None):
+            raise serializers.ValidationError({"non_field_errors": ["Este registro foi alterado ou excluído em outra solicitação. Recarregue a página antes de tentar novamente."]})
+        return super().update(current, validated_data)
 
 
 class CategorySerializer(OwnedSerializer):

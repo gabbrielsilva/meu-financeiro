@@ -1,4 +1,5 @@
 from django.contrib.auth import authenticate, get_user_model, login, logout
+import logging
 from django.db import IntegrityError, transaction
 from django.http import JsonResponse
 from django.middleware.csrf import get_token
@@ -8,7 +9,7 @@ from django.views.decorators.cache import never_cache
 from rest_framework import status
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
-from rest_framework.throttling import ScopedRateThrottle
+from .throttling import AuthRateThrottle
 from rest_framework.views import APIView
 
 from .serializers import LoginSerializer, RegisterSerializer, UserSerializer
@@ -34,7 +35,7 @@ class CsrfView(AuthView):
 
 class RegisterView(AuthView):
     permission_classes = [AllowAny]
-    throttle_classes = [ScopedRateThrottle]
+    throttle_classes = [AuthRateThrottle]
     throttle_scope = "register"
 
     def post(self, request):
@@ -44,13 +45,14 @@ class RegisterView(AuthView):
             with transaction.atomic():
                 user = register_user(**serializer.validated_data)
         except IntegrityError:
+            logging.getLogger(__name__).warning("Conflito no cadastro", exc_info=True)
             return Response({"email": ["Não foi possível cadastrar este e-mail."]}, status=400)
         return Response(UserSerializer(user).data, status=status.HTTP_201_CREATED)
 
 
 class LoginView(AuthView):
     permission_classes = [AllowAny]
-    throttle_classes = [ScopedRateThrottle]
+    throttle_classes = [AuthRateThrottle]
     throttle_scope = "login"
 
     def post(self, request):

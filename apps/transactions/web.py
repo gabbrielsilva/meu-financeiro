@@ -9,7 +9,7 @@ from apps.categories.models import Category, Subcategory
 from .forms import HistoryForm, TransactionForm
 from .models import Transaction
 from .queries import history
-from .serializers import TransactionSerializer
+from .serializers import TransactionSerializer, VersionSerializer
 from .services import soft_delete
 
 
@@ -72,7 +72,14 @@ def transaction_edit(request, pk=None):
 def transaction_delete(request, pk):
     movement = get_object_or_404(Transaction, pk=pk, user=request.user, deleted_at__isnull=True)
     if request.method == "POST":
-        soft_delete(movement)
-        messages.success(request, "Movimentação excluída do histórico.")
-        return redirect("transactions")
+        version = VersionSerializer(data={"expected_version": request.POST.get("expected_version", "")})
+        try:
+            version.is_valid(raise_exception=True)
+            soft_delete(movement, version.validated_data["expected_version"])
+        except ValidationError:
+            messages.error(request, "Este registro mudou ou a confirmação expirou. Confira os dados atuais antes de confirmar novamente.")
+            return redirect("transaction-delete", pk=pk)
+        else:
+            messages.success(request, "Movimentação excluída do histórico.")
+            return redirect("transactions")
     return render(request, "transactions/delete.html", {"title": "Excluir movimentação", "movement": movement})

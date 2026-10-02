@@ -1,4 +1,5 @@
 from datetime import timedelta
+from uuid import uuid4
 from decimal import Decimal
 from django.core.cache import cache
 from django.db import IntegrityError, transaction
@@ -23,10 +24,10 @@ class TransactionTests(TestCase):
         self.client.force_login(self.user)
         self.category = Category.objects.get(user=self.user, name="Alimentação")
         self.sub = self.category.subcategories.get(name="Mercado")
-        self.payload = {"type": "DESPESA", "amount": "32.50", "category": self.category.pk, "subcategory": self.sub.pk, "payment_method": "PIX", "transaction_date": timezone.localdate().isoformat(), "description": "Compra de teste"}
+        self.payload = {"request_id": str(uuid4()), "type": "DESPESA", "amount": "32.50", "category": self.category.pk, "subcategory": self.sub.pk, "payment_method": "PIX", "transaction_date": timezone.localdate().isoformat(), "description": "Compra de teste"}
 
     def create(self, **changes):
-        return self.client.post("/api/v1/transactions", {**self.payload, **changes}, format="json")
+        return self.client.post("/api/v1/transactions", {**self.payload, "request_id": str(uuid4()), **changes}, format="json")
 
     def test_expense_and_income_are_positive_decimals(self):
         response = self.create()
@@ -79,10 +80,10 @@ class TransactionTests(TestCase):
     def test_partial_edit_validates_complete_result(self):
         pk = self.create().data["id"]
         endpoint = f"/api/v1/transactions/{pk}"
-        self.assertEqual(self.client.patch(endpoint, {"amount": "40.01"}, format="json").status_code, 200)
+        self.assertEqual(self.client.patch(endpoint, {"expected_version": Transaction.objects.get(pk=pk).updated_at.isoformat(), "amount": "40.01"}, format="json").status_code, 200)
         self.assertEqual(Transaction.objects.get(pk=pk).amount, Decimal("40.01"))
         for changes in ({"type": "RECEITA"}, {"subcategory": None}, {"category": Category.objects.get(user=self.user, name="Moradia").pk}, {"transaction_date": (timezone.localdate() + timedelta(days=1)).isoformat()}):
-            self.assertEqual(self.client.patch(endpoint, changes, format="json").status_code, 400)
+            self.assertEqual(self.client.patch(endpoint, {**changes, "expected_version": Transaction.objects.get(pk=pk).updated_at.isoformat()}, format="json").status_code, 400)
 
     def test_edit_can_keep_old_inactive_classification_but_not_switch_to_it(self):
         pk = self.create().data["id"]
@@ -92,13 +93,13 @@ class TransactionTests(TestCase):
         self.sub.is_active = False
         self.sub.save()
         endpoint = f"/api/v1/transactions/{pk}"
-        self.assertEqual(self.client.patch(endpoint, {"description": "Correção"}, format="json").status_code, 200)
-        self.assertEqual(self.client.patch(endpoint, {"subcategory": another.pk}, format="json").status_code, 400)
+        self.assertEqual(self.client.patch(endpoint, {"expected_version": Transaction.objects.get(pk=pk).updated_at.isoformat(), "description": "Correção"}, format="json").status_code, 200)
+        self.assertEqual(self.client.patch(endpoint, {"expected_version": Transaction.objects.get(pk=pk).updated_at.isoformat(), "subcategory": another.pk}, format="json").status_code, 400)
 
     def test_soft_delete_hides_record_and_blocks_further_access(self):
         pk = self.create().data["id"]
         endpoint = f"/api/v1/transactions/{pk}"
-        self.assertEqual(self.client.delete(endpoint).status_code, 204)
+        self.assertEqual(self.client.delete(endpoint, {"expected_version": Transaction.objects.get(pk=pk).updated_at.isoformat()}, format="json").status_code, 204)
         self.assertIsNotNone(Transaction.objects.get(pk=pk).deleted_at)
         self.assertEqual(self.client.get("/api/v1/transactions").data["count"], 0)
         self.assertEqual(self.client.get(endpoint).status_code, 404)

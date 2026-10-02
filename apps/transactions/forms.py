@@ -1,4 +1,5 @@
 from django import forms
+from uuid import uuid4
 from django.db.models import Q
 from django.utils import timezone
 from apps.accounts.forms import StyledForm
@@ -8,6 +9,8 @@ from apps.reports.periods import MONTHS
 
 
 class TransactionForm(StyledForm):
+    request_id = forms.UUIDField(widget=forms.HiddenInput)
+    expected_version = forms.DateTimeField(widget=forms.HiddenInput)
     type = forms.ChoiceField(label="Tipo", choices=MovementType.choices, initial="DESPESA")
     amount = forms.DecimalField(label="Valor (R$)", max_digits=14, decimal_places=2, localize=True, widget=forms.TextInput(attrs={"inputmode": "decimal", "placeholder": "0,00"}))
     category = forms.ModelChoiceField(label="Categoria", queryset=Category.objects.none())
@@ -18,6 +21,12 @@ class TransactionForm(StyledForm):
 
     def __init__(self, *args, user, instance=None, **kwargs):
         super().__init__(*args, **kwargs)
+        if instance:
+            self.fields.pop("request_id")
+            self.initial["expected_version"] = instance.updated_at.isoformat()
+        else:
+            self.fields.pop("expected_version")
+            self.initial["request_id"] = uuid4()
         self.order_fields(["type", "description", "amount", "transaction_date", "category", "subcategory", "payment_method"])
         self.fields["transaction_date"].widget.attrs["max"] = timezone.localdate().isoformat()
         allowed_categories = Q(is_active=True)

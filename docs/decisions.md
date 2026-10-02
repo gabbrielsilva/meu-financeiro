@@ -57,3 +57,47 @@
 - Subcategorias integradas visualmente às categorias; rota antiga e APIs preservadas.
 - Configurações apenas consulta informações da conta. Sem nova edição de perfil.
 - Busca textual e mês/ano complementam os filtros existentes, combinados por interseção.
+
+## Preparação para produção — 01/10/2026
+
+- Dois contextos via DJANGO_ENV externo, sem mudar os comandos locais existentes.
+  Produção não lê .env; DEBUG=True, chave fraca/ausente, hosts não explícitos e
+  configuração TLS ausente para PostgreSQL impedem a inicialização.
+- WhiteNoise 6.12.0 é a única dependência nova: estáticos locais com manifesto,
+  compressão e cache. Demais versões preservadas. Removido somente o comentário
+  sourceMappingURL do Bootstrap, pois o mapa não distribuído impedia collectstatic.
+- Proxy HTTPS exige opt-in após validar sanitização do cabeçalho e isolamento de rede.
+  HSTS/subdomínios/preload aguardam domínio e HTTPS reais. Avisos não são silenciados.
+- Logs JSON em stderr conservam tipo e locais de exceção sem mensagens/payloads
+  potencialmente sensíveis. Páginas genéricas 400/403/404/500 não dependem de banco
+  ou estáticos para informar o erro.
+- Sem mudanças financeiras, migrações, plataforma externa, deploy, commit ou push.
+
+## Correções após revisão técnica — 01/10/2026
+
+- Controle de concorrência no salvamento compartilhado: bloqueio de linha e comparação
+  de updated_at, rejeitando snapshots ultrapassados/excluídos. Soft delete faz UPDATE
+  limitado aos campos de exclusão. Sem reintroduzir valores financeiros antigos.
+- Limites de autenticação atômicos no PostgreSQL, compartilhados entre workers e entre
+  HTML/API. Proxy IP explícito, X-Forwarded-For não confiável ignorado, HMAC nas chaves,
+  indisponibilidade do contador retorna 503. Sem nova dependência externa.
+- Entrada JSON de tipo inesperado retorna 400. Erros de integridade são registrados,
+  com SQLSTATE seguro em produção. Removido template legado sem uso.
+- Migração aditiva accounts.0002_authratebucket, sem alteração de dados financeiros.
+- Recuperação de senha, idempotência de criação e novas funcionalidades seguem fora
+  desta correção. Infraestrutura e backup/restauração dependem da hospedagem futura.
+
+## Reenvio e formulários antigos — 01/10/2026
+
+- request_id UUID obrigatório na criação, único por usuário; hash dos campos validados
+  identifica reenvio compatível. Criações concorrentes da mesma conta são serializadas
+  com bloqueio de linha do usuário, sem dependência adicional. Reenvio válido retorna
+  o registro atual existente; não recria excluídos nem reaplica dados de criação.
+- expected_version obrigatório em edição e exclusão de movimentações, baseado no
+  updated_at consultado. Campos ocultos na interface; contrato explícito na API.
+- Conflito mantém dados digitados e oferece reabertura por GET. Confirmação de exclusão
+  desatualizada exige nova confirmação com dados atuais. Nenhuma mesclagem automática.
+- Migração aditiva transactions.0003: campos técnicos nulos/vazios nos dados anteriores
+  e constraint de unicidade, sem modificar valores financeiros ou datas existentes.
+- Escopo de formulários antigos: movimentações. Categorias/subcategorias mantêm somente
+  a proteção de requisições simultâneas da etapa anterior.

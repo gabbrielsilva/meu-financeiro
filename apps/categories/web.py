@@ -20,10 +20,7 @@ def category_list(request):
 @login_required
 def subcategory_list(request):
     # Keep the previous URL working while showing the integrated management area.
-    return render(request, "categories/list.html", {
-        "categories": Category.objects.filter(user=request.user).prefetch_related("subcategories"),
-        "title": "Categorias",
-    })
+    return category_list(request)
 
 
 @never_cache
