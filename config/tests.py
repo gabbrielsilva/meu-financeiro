@@ -44,6 +44,7 @@ class ProductionConfigurationTests(SimpleTestCase):
             {"POSTGRES_PASSWORD": ""}, {"POSTGRES_SSLMODE": ""},
             {"DJANGO_ENV": "prodution"}, {"DJANGO_HSTS_SECONDS": "-1"},
             {"DJANGO_TRUST_PROXY_HEADERS": "yes"},
+            {"DJANGO_CLIENT_IP_HEADER": "HTTP_USER_SUPPLIED_IP"},
         ]
         for changes in invalid:
             with self.subTest(changes=changes):
@@ -71,6 +72,16 @@ assert s.SECURE_HSTS_SECONDS == 0
         self.assertEqual(result.returncode, 0, result.stderr)
         result = self.probe(self.environment(DJANGO_TRUST_PROXY_HEADERS="true"),
                             "import config.settings as s; assert s.SECURE_PROXY_SSL_HEADER == ('HTTP_X_FORWARDED_PROTO', 'https')")
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_hsts_short_window_without_subdomain_or_preload(self):
+        result = self.probe(self.environment(DJANGO_HSTS_SECONDS="3600"), '''
+import django
+django.setup()
+from django.test import Client
+r = Client().get('/hsts-test-missing/', secure=True)
+assert r['Strict-Transport-Security'] == 'max-age=3600'
+''')
         self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_production_static_assets_errors_and_https_without_database(self):

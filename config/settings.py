@@ -39,6 +39,11 @@ try:
 except ValueError as exc:
     raise ImproperlyConfigured("DJANGO_TRUSTED_PROXY_IPS deve conter apenas IPs explícitos separados por vírgula.") from exc
 
+# Opt in only behind an edge that overwrites this header and blocks direct access.
+AUTH_CLIENT_IP_HEADER = os.environ.get("DJANGO_CLIENT_IP_HEADER", "").strip() or "HTTP_X_FORWARDED_FOR"
+if AUTH_CLIENT_IP_HEADER not in {"HTTP_X_FORWARDED_FOR", "HTTP_CF_CONNECTING_IP"}:
+    raise ImproperlyConfigured("DJANGO_CLIENT_IP_HEADER deve ser HTTP_X_FORWARDED_FOR ou HTTP_CF_CONNECTING_IP.")
+
 
 SECRET_KEY = required("DJANGO_SECRET_KEY")
 DEBUG = bool_env("DJANGO_DEBUG")

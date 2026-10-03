@@ -20,6 +20,29 @@ def attempt(forwarded="198.51.100.1"):
 
 
 class AuthThrottleTests(TestCase):
+    @override_settings(AUTH_TRUSTED_PROXY_IPS={'127.0.0.1'}, AUTH_CLIENT_IP_HEADER='HTTP_CF_CONNECTING_IP')
+    def test_edge_visitors_have_separate_limits_and_xff_cannot_bypass(self):
+        factory = RequestFactory()
+        view = SimpleNamespace(throttle_scope='login')
+        for i in range(6):
+            request = factory.post('/entrar/', REMOTE_ADDR='127.0.0.1',
+                HTTP_CF_CONNECTING_IP='203.0.113.8', HTTP_X_FORWARDED_FOR=f'198.51.100.{i}')
+            self.assertEqual(AuthRateThrottle().allow_request(request, view), i < 5)
+        other = factory.post('/entrar/', REMOTE_ADDR='127.0.0.1', HTTP_CF_CONNECTING_IP='203.0.113.9')
+        self.assertTrue(AuthRateThrottle().allow_request(other, view))
+        self.assertEqual(AuthRateBucket.objects.count(), 2)
+
+    @override_settings(AUTH_TRUSTED_PROXY_IPS={'127.0.0.1'}, AUTH_CLIENT_IP_HEADER='HTTP_CF_CONNECTING_IP')
+    def test_edge_header_requires_trusted_peer_and_single_valid_address(self):
+        request = RequestFactory().get('/', REMOTE_ADDR='192.0.2.1', HTTP_CF_CONNECTING_IP='203.0.113.8')
+        self.assertEqual(client_ip(request), '192.0.2.1')
+        request.META['REMOTE_ADDR'] = '127.0.0.1'
+        for value in ['', 'invalid', '203.0.113.8, 203.0.113.9']:
+            request.META['HTTP_CF_CONNECTING_IP'] = value
+            self.assertEqual(client_ip(request), '127.0.0.1')
+        request.META['HTTP_CF_CONNECTING_IP'] = '2001:db8::1'
+        self.assertEqual(client_ip(request), '2001:db8::1')
+
     def test_spoofed_forwarded_addresses_cannot_reset_limit(self):
         self.assertEqual([attempt(f'198.51.100.{i}') for i in range(6)], [True]*5 + [False])
         bucket = AuthRateBucket.objects.get()

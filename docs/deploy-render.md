@@ -24,7 +24,11 @@ anterior. O plano gratuito não dispõe de comando separado de pré-deploy.
 - `DJANGO_ALLOWED_HOSTS`: hostname exato atribuído pelo Render, sem protocolo.
 - `DJANGO_CSRF_TRUSTED_ORIGINS`: endereço HTTPS desse hostname.
 - `DJANGO_TRUST_PROXY_HEADERS=true`: somente no serviço atrás do proxy Render.
-- `DJANGO_HSTS_SECONDS=0` inicialmente; elevar após verificar HTTPS.
+- `DJANGO_HSTS_SECONDS=3600`: HSTS inicial de uma hora, sem subdomínios/preload.
+- `DJANGO_TRUSTED_PROXY_IPS=127.0.0.1`: peer observado no Gunicorn do Render.
+- `DJANGO_CLIENT_IP_HEADER=HTTP_CF_CONNECTING_IP`: somente atrás do edge
+  Cloudflare do Render, que substitui esse cabeçalho. Revalidar com requisições
+  de cabeçalho forjado se a hospedagem ou cadeia de proxies mudar.
 - `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_HOST` e
   `POSTGRES_PORT`: conexão do projeto Neon `meu-financeiro-teste`.
 - `POSTGRES_SSLMODE=verify-full` e
@@ -32,9 +36,11 @@ anterior. O plano gratuito não dispõe de comando separado de pré-deploy.
   certificadoras do pacote certifi fixado nas dependências de deploy, sem depender
   do bundle antigo da imagem de hospedagem. A validação completa permanece ativa.
 
-Não adivinhe IPs de proxy nem use curingas para confiar em cabeçalhos. Enquanto
-`DJANGO_TRUSTED_PROXY_IPS` não estiver configurado com IPs verificados, o limite
-de login usa o endereço do proxy e pode ser compartilhado entre visitantes.
+Não adivinhe IPs de proxy nem use curingas para confiar em cabeçalhos. Cabeçalhos
+de peers não confiáveis são ignorados. Se o cabeçalho individual estiver ausente
+ou inválido, usa-se o peer como fallback conservador. Pessoas na mesma rede pública
+ainda compartilham o limite por IP. O padrão para outras hospedagens permanece
+`HTTP_X_FORWARDED_FOR` com leitura da cadeia da direita para a esquerda.
 
 ## Verificação antes de considerar concluído
 

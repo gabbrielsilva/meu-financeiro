@@ -27,6 +27,11 @@ def client_ip(request):
     trusted = settings.AUTH_TRUSTED_PROXY_IPS
     if peer not in trusted:
         return peer
+    if settings.AUTH_CLIENT_IP_HEADER == "HTTP_CF_CONNECTING_IP":
+        try:
+            return str(ip_address(request.META.get("HTTP_CF_CONNECTING_IP", "").strip()))
+        except ValueError:
+            return peer
     forwarded = request.META.get("HTTP_X_FORWARDED_FOR", "")
     try:
         chain = [str(ip_address(item.strip())) for item in forwarded.split(",")]
