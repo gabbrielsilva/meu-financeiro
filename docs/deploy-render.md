@@ -27,7 +27,10 @@ anterior. O plano gratuito não dispõe de comando separado de pré-deploy.
 - `DJANGO_HSTS_SECONDS=0` inicialmente; elevar após verificar HTTPS.
 - `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_HOST` e
   `POSTGRES_PORT`: conexão do projeto Neon `meu-financeiro-teste`.
-- `POSTGRES_SSLMODE=verify-full`, `POSTGRES_SSLROOTCERT=system`.
+- `POSTGRES_SSLMODE=verify-full` e
+  `POSTGRES_SSLROOTCERT=.local/ca-bundle.pem`. O build copia as autoridades
+  certificadoras do pacote certifi fixado nas dependências de deploy, sem depender
+  do bundle antigo da imagem de hospedagem. A validação completa permanece ativa.
 
 Não adivinhe IPs de proxy nem use curingas para confiar em cabeçalhos. Enquanto
 `DJANGO_TRUSTED_PROXY_IPS` não estiver configurado com IPs verificados, o limite
